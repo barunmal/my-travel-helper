@@ -10,6 +10,23 @@ const tabs = [
   { id: 'budget', label: '예산', icon: 'wallet' }
 ]
 
+const quickSections = [
+  { id: 'all', label: '전체 일정', tab: 'schedule', filter: 'all' },
+  { id: 'food', label: '맛집', tab: 'schedule', filter: 'food' },
+  { id: 'shopping', label: '쇼핑', tab: 'schedule', filter: 'shopping' },
+  { id: 'ready', label: '준비물', tab: 'checklist' }
+]
+
+const categoryMeta = {
+  transport: { label: '이동', icon: '✈' },
+  food: { label: '맛집', icon: '🍜' },
+  shopping: { label: '쇼핑', icon: '🛍' },
+  hotel: { label: '숙소', icon: '🏨' },
+  park: { label: '산책', icon: '🌳' },
+  fun: { label: '체험', icon: '🎮' },
+  ready: { label: '준비', icon: '🧳' }
+}
+
 const schedule = [
   {
     day: 'Day 1',
@@ -241,8 +258,27 @@ function mapUrl(query) {
   return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`
 }
 
+function getCategory(item) {
+  const text = `${item.name} ${item.desc}`.toLowerCase()
+
+  if (text.includes('공항') || text.includes('도착') || text.includes('출국')) return 'transport'
+  if (text.includes('라멘') || text.includes('쿠라스시') || text.includes('함바그') || text.includes('점심') || text.includes('식사')) return 'food'
+  if (text.includes('돈키호테') || text.includes('쇼핑') || text.includes('포켓몬') || text.includes('가챠') || text.includes('지하상가') || text.includes('만세이도')) return 'shopping'
+  if (text.includes('호텔') || text.includes('체크인') || text.includes('숙소')) return 'hotel'
+  if (text.includes('공원') || text.includes('동식물원') || text.includes('산책')) return 'park'
+  if (text.includes('카고패스') || text.includes('짐')) return 'ready'
+
+  return 'fun'
+}
+
+function filterScheduleItems(items, filter) {
+  if (filter === 'all') return items
+  return items.filter((item) => getCategory(item) === filter)
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('schedule')
+  const [scheduleFilter, setScheduleFilter] = useState('all')
   const [shoppingChecked, setShoppingChecked] = useLocalState('shoppingChecked', {})
   const [readyChecked, setReadyChecked] = useLocalState('readyChecked', {})
   const [budget, setBudget] = useLocalState('budget', { shopping: '', food: '', transport: '' })
@@ -256,21 +292,41 @@ function App() {
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-950">
       <section className="mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-iphone">
-        <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/90 px-5 pb-3 pt-[max(18px,env(safe-area-inset-top))] backdrop-blur-xl">
+        <header className="sticky top-0 z-20 border-b border-slate-100 bg-white/90 px-5 pb-3 pt-[max(12px,env(safe-area-inset-top))] backdrop-blur-xl">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-semibold text-blue-600">2박 3일</p>
-              <h1 className="text-2xl font-bold tracking-normal">여행 도우미</h1>
+              <p className="text-xs font-semibold text-blue-600">2박 3일</p>
+              <h1 className="text-xl font-bold tracking-normal">여행 도우미</h1>
             </div>
-            <div className="grid h-12 w-12 place-items-center rounded-[8px] bg-blue-50 text-xl">✈</div>
+            <div className="grid h-10 w-10 place-items-center rounded-[8px] bg-blue-50 text-lg">✈</div>
           </div>
-          <div className="mt-4 h-32 overflow-hidden rounded-[8px]">
+          <div className="mt-3 h-16 overflow-hidden rounded-[8px]">
             <img className="h-full w-full object-cover" src="https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=1000&q=80" alt="일본 여행 거리 풍경" />
+          </div>
+          <div className="mt-3 grid grid-cols-4 gap-2">
+            {quickSections.map((section) => {
+              const isActive = activeTab === section.tab && (section.filter ? scheduleFilter === section.filter : true)
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  onClick={() => {
+                    if (section.filter) setScheduleFilter(section.filter)
+                    setActiveTab(section.tab)
+                  }}
+                  className={`min-h-10 rounded-[8px] px-2 text-xs font-bold leading-4 transition ${
+                    isActive ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'bg-slate-100 text-slate-600'
+                  }`}
+                >
+                  {section.label}
+                </button>
+              )
+            })}
           </div>
         </header>
 
         <div className="flex-1 px-5 pb-28 pt-5">
-          {activeTab === 'schedule' && <Schedule />}
+          {activeTab === 'schedule' && <Schedule filter={scheduleFilter} setFilter={setScheduleFilter} />}
           {activeTab === 'shopping' && (
             <Shopping checked={shoppingChecked} onToggle={(name) => setShoppingChecked((prev) => ({ ...prev, [name]: !prev[name] }))} />
           )}
@@ -311,47 +367,91 @@ function SectionTitle({ title, subtitle }) {
   )
 }
 
-function Schedule() {
+function Schedule({ filter, setFilter }) {
+  const [selectedDay, setSelectedDay] = useState(schedule[0].day)
+  const currentDay = schedule.find((day) => day.day === selectedDay) || schedule[0]
+  const filteredItems = filterScheduleItems(currentDay.items, filter)
+  const filterLabel = quickSections.find((section) => section.filter === filter)?.label || '전체 일정'
+
   return (
-    <div>
-      <SectionTitle title="일정" subtitle="하루씩 펼쳐서 동선을 확인하세요." />
-      <div className="space-y-4">
+    <div className="space-y-4">
+      <SectionTitle title="일정" subtitle="여행 중 바로 확인하기 좋게 하루별로 정리했어요." />
+
+      <div className="grid grid-cols-3 gap-2 rounded-[8px] bg-slate-100 p-1">
         {schedule.map((day) => (
-          <article key={day.day} className="rounded-[8px] border border-slate-100 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-bold text-blue-600">{day.day}</p>
-                <h3 className="text-lg font-bold">{day.title}</h3>
-              </div>
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-sm font-semibold text-blue-700">{day.items.length}곳</span>
-            </div>
-            <div className="space-y-3">
-              {day.items.map((item) => (
-                <PlaceCard item={item} key={`${day.day}-${item.name}`} />
-              ))}
-            </div>
-          </article>
+          <button
+            key={day.day}
+            type="button"
+            onClick={() => setSelectedDay(day.day)}
+            className={`min-h-12 rounded-[8px] text-base font-extrabold transition ${
+              selectedDay === day.day ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
+            }`}
+          >
+            {day.day}
+          </button>
         ))}
+      </div>
+
+      <div className="rounded-[8px] bg-blue-600 p-4 text-white shadow-lg shadow-blue-100">
+        <p className="text-sm font-bold text-blue-100">{filterLabel}</p>
+        <div className="mt-1 flex items-end justify-between gap-3">
+          <div>
+            <h3 className="text-xl font-extrabold">{currentDay.title}</h3>
+            <p className="mt-1 text-sm text-blue-50">{filteredItems.length}개 일정</p>
+          </div>
+          {filter !== 'all' && (
+            <button
+              type="button"
+              onClick={() => setFilter('all')}
+              className="shrink-0 rounded-[8px] bg-white/15 px-3 py-2 text-sm font-bold text-white"
+            >
+              전체 보기
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {filteredItems.map((item) => (
+          <PlaceCard item={item} key={`${currentDay.day}-${item.name}`} />
+        ))}
+        {filteredItems.length === 0 && (
+          <div className="rounded-[8px] border border-slate-100 bg-white p-5 text-center text-sm font-bold text-slate-500 shadow-sm">
+            이 날에는 해당 섹션 일정이 없어요.
+          </div>
+        )}
       </div>
     </div>
   )
 }
 
 function PlaceCard({ item }) {
+  const category = categoryMeta[getCategory(item)]
+
   return (
-    <div className="overflow-hidden rounded-[8px] border border-slate-100 bg-slate-50">
-      {item.image && <img src={item.image} alt={item.name} className="h-36 w-full object-cover" />}
-      <div className="p-4">
-        <div className="flex gap-3">
-          <time className="min-w-14 rounded-[8px] bg-white px-2 py-2 text-center text-xs font-bold text-blue-700 shadow-sm">{item.time}</time>
-          <div className="min-w-0 flex-1">
-            <h4 className="font-bold">{item.name}</h4>
-            <p className="mt-1 text-sm leading-5 text-slate-600">{item.desc}</p>
+    <div className="overflow-hidden rounded-[8px] border border-slate-100 bg-white shadow-sm">
+      <div className="flex gap-3 p-3">
+        {item.image && <img src={item.image} alt={item.name} className="h-24 w-24 shrink-0 rounded-[8px] object-cover" />}
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-3">
+            <time className="min-w-16 rounded-[8px] bg-blue-50 px-2 py-2 text-center text-sm font-extrabold text-blue-700">{item.time}</time>
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2">
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-slate-100 text-base">{category.icon}</span>
+                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">{category.label}</span>
+              </div>
+              <h4 className="mt-2 text-lg font-extrabold leading-6">{item.name}</h4>
+            </div>
           </div>
+          <div className="min-w-0 flex-1">
+            <p className="mt-2 text-base leading-6 text-slate-600">{item.desc}</p>
+          </div>
+          {item.query && (
+            <a className="mt-3 flex h-12 items-center justify-center rounded-[8px] bg-blue-600 text-base font-extrabold text-white" href={mapUrl(item.query)} target="_blank" rel="noreferrer">
+              Google Maps
+            </a>
+          )}
         </div>
-        <a className="mt-3 flex h-11 items-center justify-center rounded-[8px] bg-blue-600 font-bold text-white" href={mapUrl(item.query)} target="_blank" rel="noreferrer">
-          Google Maps
-        </a>
       </div>
     </div>
   )
