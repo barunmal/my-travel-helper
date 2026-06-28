@@ -168,14 +168,14 @@ const schedule = [
 ]
 
 const shoppingItems = [
-  { name: '포켓몬 배스볼', category: '굿즈', image: 'https://images.unsplash.com/photo-1609372332255-611485350f25?auto=format&fit=crop&w=700&q=80' },
-  { name: '케이프 슈퍼하드', category: '헤어', image: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?auto=format&fit=crop&w=700&q=80' },
-  { name: '모아립', category: '뷰티', image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=700&q=80' },
-  { name: '신비오페르민', category: '의약품', image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=700&q=80' },
-  { name: '에비오스', category: '영양제', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80' },
-  { name: '록소닌', category: '의약품', image: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=700&q=80' },
-  { name: '다이쇼K', category: '의약품', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=700&q=80' },
-  { name: '간식 / 젤리 / 과자', category: '간식', image: 'https://images.unsplash.com/photo-1582058091505-f87a2e55a40f?auto=format&fit=crop&w=700&q=80' }
+  { id: 'default-pokemon-bathball', name: '포켓몬 배스볼', category: '굿즈', image: 'https://images.unsplash.com/photo-1609372332255-611485350f25?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-cape-super-hard', name: '케이프 슈퍼하드', category: '헤어', image: 'https://images.unsplash.com/photo-1522338242992-e1a54906a8da?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-moalip', name: '모아립', category: '뷰티', image: 'https://images.unsplash.com/photo-1586495777744-4413f21062fa?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-shinbiofermin', name: '신비오페르민', category: '의약품', image: 'https://images.unsplash.com/photo-1471864190281-a93a3070b6de?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-ebios', name: '에비오스', category: '영양제', image: 'https://images.unsplash.com/photo-1584308666744-24d5c474f2ae?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-loxonin', name: '록소닌', category: '의약품', image: 'https://images.unsplash.com/photo-1587854692152-cbe660dbde88?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-taisho-k', name: '다이쇼K', category: '의약품', image: 'https://images.unsplash.com/photo-1585435557343-3b092031a831?auto=format&fit=crop&w=700&q=80' },
+  { id: 'default-snacks', name: '간식 / 젤리 / 과자', category: '간식', image: 'https://images.unsplash.com/photo-1582058091505-f87a2e55a40f?auto=format&fit=crop&w=700&q=80' }
 ]
 
 const checklistItems = [
@@ -276,10 +276,20 @@ function filterScheduleItems(items, filter) {
   return items.filter((item) => getCategory(item) === filter)
 }
 
+function sortScheduleItems(items) {
+  return [...items].sort((a, b) => {
+    const timeA = /^\d{2}:\d{2}$/.test(a.time) ? a.time : '99:99'
+    const timeB = /^\d{2}:\d{2}$/.test(b.time) ? b.time : '99:99'
+    return timeA.localeCompare(timeB)
+  })
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('schedule')
   const [scheduleFilter, setScheduleFilter] = useState('all')
   const [shoppingChecked, setShoppingChecked] = useLocalState('shoppingChecked', {})
+  const [customShoppingItems, setCustomShoppingItems] = useLocalState('customShoppingItems', [])
+  const [customScheduleItems, setCustomScheduleItems] = useLocalState('customScheduleItems', [])
   const [readyChecked, setReadyChecked] = useLocalState('readyChecked', {})
   const [budget, setBudget] = useLocalState('budget', { shopping: '', food: '', transport: '' })
   const total = useMemo(
@@ -287,7 +297,12 @@ function App() {
     [budget]
   )
 
-  const allPlaces = schedule.flatMap((day) => day.items.map((item) => ({ ...item, day: day.day })))
+  const scheduleWithCustomItems = schedule.map((day) => ({
+    ...day,
+    items: sortScheduleItems([...day.items, ...customScheduleItems.filter((item) => item.day === day.day)])
+  }))
+  const allPlaces = scheduleWithCustomItems.flatMap((day) => day.items.map((item) => ({ ...item, day: day.day })))
+  const allShoppingItems = [...shoppingItems, ...customShoppingItems]
 
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-950">
@@ -326,9 +341,21 @@ function App() {
         </header>
 
         <div className="flex-1 px-4 pb-28 pt-5">
-          {activeTab === 'schedule' && <Schedule filter={scheduleFilter} setFilter={setScheduleFilter} />}
+          {activeTab === 'schedule' && (
+            <Schedule
+              filter={scheduleFilter}
+              setFilter={setScheduleFilter}
+              days={scheduleWithCustomItems}
+              onAddSchedule={(item) => setCustomScheduleItems((prev) => [...prev, item])}
+            />
+          )}
           {activeTab === 'shopping' && (
-            <Shopping checked={shoppingChecked} onToggle={(name) => setShoppingChecked((prev) => ({ ...prev, [name]: !prev[name] }))} />
+            <Shopping
+              checked={shoppingChecked}
+              items={allShoppingItems}
+              onAddItem={(item) => setCustomShoppingItems((prev) => [...prev, item])}
+              onToggle={(id) => setShoppingChecked((prev) => ({ ...prev, [id]: !prev[id] }))}
+            />
           )}
           {activeTab === 'map' && <MapList places={allPlaces} />}
           {activeTab === 'checklist' && (
@@ -367,18 +394,79 @@ function SectionTitle({ title, subtitle }) {
   )
 }
 
-function Schedule({ filter, setFilter }) {
-  const [selectedDay, setSelectedDay] = useState(schedule[0].day)
-  const currentDay = schedule.find((day) => day.day === selectedDay) || schedule[0]
+function Schedule({ filter, setFilter, days, onAddSchedule }) {
+  const [selectedDay, setSelectedDay] = useState(days[0].day)
+  const [newSchedule, setNewSchedule] = useState({ day: days[0].day, time: '', name: '' })
+  const currentDay = days.find((day) => day.day === selectedDay) || days[0]
   const filteredItems = filterScheduleItems(currentDay.items, filter)
   const filterLabel = quickSections.find((section) => section.filter === filter)?.label || '전체 일정'
+  const canAddSchedule = newSchedule.name.trim() && /^\d{2}:\d{2}$/.test(newSchedule.time)
+
+  const handleAddSchedule = (event) => {
+    event.preventDefault()
+    const name = newSchedule.name.trim()
+    const time = newSchedule.time.trim()
+    if (!name || !/^\d{2}:\d{2}$/.test(time)) return
+
+    onAddSchedule({
+      id: `custom-schedule-${Date.now()}`,
+      day: newSchedule.day,
+      time,
+      name,
+      desc: '직접 추가한 일정',
+      query: '',
+      custom: true
+    })
+    setSelectedDay(newSchedule.day)
+    setNewSchedule((prev) => ({ ...prev, time: '', name: '' }))
+  }
 
   return (
     <div className="space-y-4">
       <SectionTitle title="일정" subtitle="여행 중 바로 확인하기 좋게 하루별로 정리했어요." />
 
+      <form onSubmit={handleAddSchedule} className="rounded-[14px] border border-slate-100 bg-white p-4 shadow-md shadow-slate-100">
+        <p className="mb-3 text-base font-extrabold">일정 추가</p>
+        <div className="grid grid-cols-[1fr_1fr] gap-2">
+          <select
+            value={newSchedule.day}
+            onChange={(event) => setNewSchedule((prev) => ({ ...prev, day: event.target.value }))}
+            className="h-12 rounded-[10px] border border-slate-200 bg-slate-50 px-3 text-base font-bold outline-none focus:border-blue-500"
+          >
+            {days.map((day) => (
+              <option key={day.day} value={day.day}>{day.day}</option>
+            ))}
+          </select>
+          <input
+            type="time"
+            value={newSchedule.time}
+            onChange={(event) => setNewSchedule((prev) => ({ ...prev, time: event.target.value }))}
+            className="h-12 rounded-[10px] border border-slate-200 bg-slate-50 px-3 text-base font-bold outline-none focus:border-blue-500"
+            aria-label="시간"
+          />
+        </div>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={newSchedule.name}
+            onChange={(event) => setNewSchedule((prev) => ({ ...prev, name: event.target.value }))}
+            className="h-12 min-w-0 flex-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 text-base font-bold outline-none focus:border-blue-500"
+            placeholder="일정 제목"
+            maxLength={40}
+          />
+          <button
+            type="submit"
+            disabled={!canAddSchedule}
+            className={`h-12 shrink-0 rounded-[10px] px-4 text-base font-extrabold ${
+              canAddSchedule ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'bg-slate-100 text-slate-400'
+            }`}
+          >
+            추가
+          </button>
+        </div>
+      </form>
+
       <div className="grid grid-cols-3 gap-2 rounded-[8px] bg-slate-100 p-1">
-        {schedule.map((day) => (
+        {days.map((day) => (
           <button
             key={day.day}
             type="button"
@@ -413,7 +501,7 @@ function Schedule({ filter, setFilter }) {
 
       <div className="space-y-4">
         {filteredItems.map((item) => (
-          <PlaceCard item={item} key={`${currentDay.day}-${item.name}`} />
+          <PlaceCard item={item} key={item.id || `${currentDay.day}-${item.name}`} />
         ))}
         {filteredItems.length === 0 && (
           <div className="rounded-[12px] border border-slate-100 bg-white p-5 text-center text-sm font-bold text-slate-500 shadow-md shadow-slate-100">
@@ -457,33 +545,71 @@ function PlaceCard({ item }) {
   )
 }
 
-function Shopping({ checked, onToggle }) {
-  const doneCount = shoppingItems.filter((item) => checked[item.name]).length
+function Shopping({ checked, items, onToggle, onAddItem }) {
+  const [newItemName, setNewItemName] = useState('')
+  const doneCount = items.filter((item) => checked[item.id] || checked[item.name]).length
+  const itemName = newItemName.trim()
+
+  const handleAddItem = (event) => {
+    event.preventDefault()
+    if (!itemName) return
+
+    onAddItem({
+      name: itemName,
+      category: '직접 추가',
+      image: 'https://images.unsplash.com/photo-1512909006721-3d6018887383?auto=format&fit=crop&w=700&q=80',
+      id: `custom-shopping-${Date.now()}`,
+      custom: true
+    })
+    setNewItemName('')
+  }
+
   return (
     <div>
-      <SectionTitle title="구매리스트" subtitle={`${doneCount}/${shoppingItems.length}개 체크됨`} />
-      <div className="space-y-3">
-        {shoppingItems.map((item) => (
+      <SectionTitle title="구매리스트" subtitle={`${doneCount}/${items.length}개 체크됨`} />
+      <form onSubmit={handleAddItem} className="mb-4 rounded-[14px] border border-slate-100 bg-white p-4 shadow-md shadow-slate-100">
+        <p className="mb-3 text-base font-extrabold">상품 추가</p>
+        <div className="flex gap-2">
+          <input
+            value={newItemName}
+            onChange={(event) => setNewItemName(event.target.value)}
+            className="h-12 min-w-0 flex-1 rounded-[10px] border border-slate-200 bg-slate-50 px-3 text-base font-bold outline-none focus:border-blue-500"
+            placeholder="상품명"
+            maxLength={40}
+          />
           <button
-            key={item.name}
+            type="submit"
+            disabled={!itemName}
+            className={`h-12 shrink-0 rounded-[10px] px-4 text-base font-extrabold ${
+              itemName ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'bg-slate-100 text-slate-400'
+            }`}
+          >
+            추가
+          </button>
+        </div>
+      </form>
+      <div className="space-y-3">
+        {items.map((item) => (
+          <button
+            key={item.id}
             type="button"
-            onClick={() => onToggle(item.name)}
+            onClick={() => onToggle(item.id)}
             className={`flex min-h-24 w-full items-center gap-3 rounded-[12px] border p-3 text-left shadow-sm transition ${
-              checked[item.name] ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white active:bg-slate-50'
+              checked[item.id] || checked[item.name] ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white active:bg-slate-50'
             }`}
           >
             <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border-2 text-lg font-extrabold ${
-              checked[item.name] ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100' : 'border-slate-300 bg-white text-transparent'
+              checked[item.id] || checked[item.name] ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100' : 'border-slate-300 bg-white text-transparent'
             }`}>
               ✓
             </span>
-            <img src={item.image} alt={item.name} className={`h-20 w-20 shrink-0 rounded-[10px] object-cover ${checked[item.name] ? 'opacity-60' : ''}`} />
+            <img src={item.image} alt={item.name} className={`h-20 w-20 shrink-0 rounded-[10px] object-cover ${checked[item.id] || checked[item.name] ? 'opacity-60' : ''}`} />
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex items-center gap-2">
-                <span className={`rounded-full px-2 py-1 text-xs font-bold ${checked[item.name] ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
-                {checked[item.name] && <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">완료</span>}
+                <span className={`rounded-full px-2 py-1 text-xs font-bold ${checked[item.id] || checked[item.name] ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
+                {(checked[item.id] || checked[item.name]) && <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">완료</span>}
               </div>
-              <p className={`text-base font-extrabold leading-6 ${checked[item.name] ? 'text-slate-400 line-through decoration-2' : 'text-slate-950'}`}>{item.name}</p>
+              <p className={`break-keep text-base font-extrabold leading-6 ${checked[item.id] || checked[item.name] ? 'text-slate-400 line-through decoration-2' : 'text-slate-950'}`}>{item.name}</p>
             </div>
           </button>
         ))}
