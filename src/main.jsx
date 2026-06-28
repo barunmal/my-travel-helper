@@ -325,7 +325,7 @@ function App() {
           </div>
         </header>
 
-        <div className="flex-1 px-5 pb-28 pt-5">
+        <div className="flex-1 px-4 pb-28 pt-5">
           {activeTab === 'schedule' && <Schedule filter={scheduleFilter} setFilter={setScheduleFilter} />}
           {activeTab === 'shopping' && (
             <Shopping checked={shoppingChecked} onToggle={(name) => setShoppingChecked((prev) => ({ ...prev, [name]: !prev[name] }))} />
@@ -411,12 +411,12 @@ function Schedule({ filter, setFilter }) {
         </div>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {filteredItems.map((item) => (
           <PlaceCard item={item} key={`${currentDay.day}-${item.name}`} />
         ))}
         {filteredItems.length === 0 && (
-          <div className="rounded-[8px] border border-slate-100 bg-white p-5 text-center text-sm font-bold text-slate-500 shadow-sm">
+          <div className="rounded-[12px] border border-slate-100 bg-white p-5 text-center text-sm font-bold text-slate-500 shadow-md shadow-slate-100">
             이 날에는 해당 섹션 일정이 없어요.
           </div>
         )}
@@ -429,15 +429,15 @@ function PlaceCard({ item }) {
   const category = categoryMeta[getCategory(item)]
 
   return (
-    <div className="overflow-hidden rounded-[8px] border border-slate-100 bg-white shadow-sm">
-      <div className="flex gap-3 p-3">
-        {item.image && <img src={item.image} alt={item.name} className="h-24 w-24 shrink-0 rounded-[8px] object-cover" />}
+    <div className="overflow-hidden rounded-[14px] border border-slate-100 bg-white shadow-lg shadow-slate-200/70 ring-1 ring-slate-50">
+      <div className="flex gap-3 p-4">
+        {item.image && <img src={item.image} alt={item.name} className="h-24 w-24 shrink-0 rounded-[12px] object-cover shadow-sm" />}
         <div className="min-w-0 flex-1">
           <div className="flex items-start gap-3">
-            <time className="min-w-16 rounded-[8px] bg-blue-50 px-2 py-2 text-center text-sm font-extrabold text-blue-700">{item.time}</time>
+            <time className="min-w-16 rounded-[12px] bg-blue-50 px-2 py-2 text-center text-sm font-extrabold text-blue-700 shadow-sm shadow-blue-100">{item.time}</time>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[8px] bg-slate-100 text-base">{category.icon}</span>
+                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-[12px] bg-slate-100 text-base">{category.icon}</span>
                 <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-bold text-slate-500">{category.label}</span>
               </div>
               <h4 className="mt-2 text-lg font-extrabold leading-6">{item.name}</h4>
@@ -447,7 +447,7 @@ function PlaceCard({ item }) {
             <p className="mt-2 text-base leading-6 text-slate-600">{item.desc}</p>
           </div>
           {item.query && (
-            <a className="mt-3 flex h-12 items-center justify-center rounded-[8px] bg-blue-600 text-base font-extrabold text-white" href={mapUrl(item.query)} target="_blank" rel="noreferrer">
+            <a className="mt-4 flex h-12 items-center justify-center rounded-[12px] bg-blue-600 text-base font-extrabold text-white shadow-md shadow-blue-200" href={mapUrl(item.query)} target="_blank" rel="noreferrer">
               Google Maps
             </a>
           )}
