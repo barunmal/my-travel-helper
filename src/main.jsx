@@ -297,6 +297,7 @@ function withDefaultScheduleIds(days) {
 
 function App() {
   const [activeTab, setActiveTab] = useState('schedule')
+  const [editMode, setEditMode] = useState(false)
   const [scheduleFilter, setScheduleFilter] = useState('all')
   const [shoppingChecked, setShoppingChecked] = useLocalState('shoppingChecked', {})
   const [customShoppingItems, setCustomShoppingItems] = useLocalState('customShoppingItems', [])
@@ -357,7 +358,18 @@ function App() {
               <p className="text-xs font-semibold text-blue-600">2박 3일</p>
               <h1 className="text-xl font-bold tracking-normal">여행 도우미</h1>
             </div>
-            <div className="grid h-10 w-10 place-items-center rounded-[8px] bg-blue-50 text-lg">✈</div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setEditMode((prev) => !prev)}
+                className={`h-10 rounded-[8px] px-3 text-sm font-extrabold transition ${
+                  editMode ? 'bg-blue-600 text-white shadow-md shadow-blue-100' : 'bg-slate-100 text-slate-600'
+                }`}
+              >
+                편집
+              </button>
+              <div className="grid h-10 w-10 place-items-center rounded-[8px] bg-blue-50 text-lg">✈</div>
+            </div>
           </div>
           <div className="mt-3 h-16 overflow-hidden rounded-[8px]">
             <img className="h-full w-full object-cover" src="https://images.unsplash.com/photo-1542051841857-5f90071e7989?auto=format&fit=crop&w=1000&q=80" alt="일본 여행 거리 풍경" />
@@ -390,6 +402,7 @@ function App() {
               filter={scheduleFilter}
               setFilter={setScheduleFilter}
               days={scheduleWithCustomItems}
+              editMode={editMode}
               onAddSchedule={(item) => setCustomScheduleItems((prev) => [...prev, item])}
               onEditSchedule={editScheduleItem}
               onDeleteSchedule={deleteScheduleItem}
@@ -399,6 +412,7 @@ function App() {
             <Shopping
               checked={shoppingChecked}
               items={allShoppingItems}
+              editMode={editMode}
               onAddItem={(item) => setCustomShoppingItems((prev) => [...prev, item])}
               onEditItem={editShoppingItem}
               onDeleteItem={deleteShoppingItem}
@@ -442,7 +456,7 @@ function SectionTitle({ title, subtitle }) {
   )
 }
 
-function Schedule({ filter, setFilter, days, onAddSchedule, onEditSchedule, onDeleteSchedule }) {
+function Schedule({ filter, setFilter, days, editMode, onAddSchedule, onEditSchedule, onDeleteSchedule }) {
   const [selectedDay, setSelectedDay] = useState(days[0].day)
   const [newSchedule, setNewSchedule] = useState({ day: days[0].day, time: '', name: '' })
   const currentDay = days.find((day) => day.day === selectedDay) || days[0]
@@ -552,6 +566,7 @@ function Schedule({ filter, setFilter, days, onAddSchedule, onEditSchedule, onDe
           <PlaceCard
             item={item}
             days={days}
+            editMode={editMode}
             key={item.id || `${currentDay.day}-${item.name}`}
             onEdit={onEditSchedule}
             onDelete={onDeleteSchedule}
@@ -567,7 +582,7 @@ function Schedule({ filter, setFilter, days, onAddSchedule, onEditSchedule, onDe
   )
 }
 
-function PlaceCard({ item, days, onEdit, onDelete }) {
+function PlaceCard({ item, days, editMode, onEdit, onDelete }) {
   const category = categoryMeta[getCategory(item)]
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState({ day: item.day, time: item.time, name: item.name })
@@ -608,15 +623,17 @@ function PlaceCard({ item, days, onEdit, onDelete }) {
               Google Maps
             </a>
           )}
-          <div className="mt-3 flex justify-end gap-2">
-            <button type="button" onClick={startEditing} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
-              수정
-            </button>
-            <button type="button" onClick={() => onDelete(item.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
-              삭제
-            </button>
-          </div>
-          {isEditing && (
+          {editMode && (
+            <div className="mt-3 flex justify-end gap-2">
+              <button type="button" onClick={startEditing} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                수정
+              </button>
+              <button type="button" onClick={() => onDelete(item.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+                삭제
+              </button>
+            </div>
+          )}
+          {editMode && isEditing && (
             <form onSubmit={saveEdit} className="mt-3 rounded-[12px] bg-slate-50 p-3">
               <div className="grid grid-cols-2 gap-2">
                 <select
@@ -658,7 +675,7 @@ function PlaceCard({ item, days, onEdit, onDelete }) {
   )
 }
 
-function Shopping({ checked, items, onToggle, onAddItem, onEditItem, onDeleteItem }) {
+function Shopping({ checked, items, editMode, onToggle, onAddItem, onEditItem, onDeleteItem }) {
   const [newItemName, setNewItemName] = useState('')
   const [editingId, setEditingId] = useState('')
   const [editName, setEditName] = useState('')
@@ -741,7 +758,7 @@ function Shopping({ checked, items, onToggle, onAddItem, onEditItem, onDeleteIte
                 <span className={`rounded-full px-2 py-1 text-xs font-bold ${checked[item.id] || checked[item.name] ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
                 {(checked[item.id] || checked[item.name]) && <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">완료</span>}
               </div>
-              {editingId === item.id ? (
+              {editMode && editingId === item.id ? (
                 <form onSubmit={(event) => saveEdit(event, item)} className="space-y-2">
                   <input
                     value={editName}
@@ -761,14 +778,16 @@ function Shopping({ checked, items, onToggle, onAddItem, onEditItem, onDeleteIte
               ) : (
                 <>
                   <p className={`break-keep text-base font-extrabold leading-6 ${checked[item.id] || checked[item.name] ? 'text-slate-400 line-through decoration-2' : 'text-slate-950'}`}>{item.name}</p>
-                  <div className="mt-2 flex justify-end gap-2">
-                    <button type="button" onClick={() => startEditing(item)} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
-                      수정
-                    </button>
-                    <button type="button" onClick={() => onDeleteItem(item.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
-                      삭제
-                    </button>
-                  </div>
+                  {editMode && (
+                    <div className="mt-2 flex justify-end gap-2">
+                      <button type="button" onClick={() => startEditing(item)} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                        수정
+                      </button>
+                      <button type="button" onClick={() => onDeleteItem(item.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+                        삭제
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
