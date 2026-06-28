@@ -284,12 +284,27 @@ function sortScheduleItems(items) {
   })
 }
 
+function withDefaultScheduleIds(days) {
+  return days.map((day, dayIndex) => ({
+    ...day,
+    items: day.items.map((item, itemIndex) => ({
+      ...item,
+      id: item.id || `default-schedule-${dayIndex}-${itemIndex}`,
+      day: day.day
+    }))
+  }))
+}
+
 function App() {
   const [activeTab, setActiveTab] = useState('schedule')
   const [scheduleFilter, setScheduleFilter] = useState('all')
   const [shoppingChecked, setShoppingChecked] = useLocalState('shoppingChecked', {})
   const [customShoppingItems, setCustomShoppingItems] = useLocalState('customShoppingItems', [])
+  const [shoppingEdits, setShoppingEdits] = useLocalState('shoppingEdits', {})
+  const [shoppingDeleted, setShoppingDeleted] = useLocalState('shoppingDeleted', [])
   const [customScheduleItems, setCustomScheduleItems] = useLocalState('customScheduleItems', [])
+  const [scheduleEdits, setScheduleEdits] = useLocalState('scheduleEdits', {})
+  const [scheduleDeleted, setScheduleDeleted] = useLocalState('scheduleDeleted', [])
   const [readyChecked, setReadyChecked] = useLocalState('readyChecked', {})
   const [budget, setBudget] = useLocalState('budget', { shopping: '', food: '', transport: '' })
   const total = useMemo(
@@ -297,12 +312,41 @@ function App() {
     [budget]
   )
 
-  const scheduleWithCustomItems = schedule.map((day) => ({
+  const scheduleWithIds = withDefaultScheduleIds(schedule)
+  const scheduleWithCustomItems = scheduleWithIds.map((day) => ({
     ...day,
-    items: sortScheduleItems([...day.items, ...customScheduleItems.filter((item) => item.day === day.day)])
+    items: sortScheduleItems(
+      [...day.items, ...customScheduleItems]
+        .filter((item) => (scheduleEdits[item.id]?.day || item.day) === day.day)
+        .filter((item) => !scheduleDeleted.includes(item.id))
+        .map((item) => ({ ...item, ...scheduleEdits[item.id], custom: item.custom }))
+    )
   }))
   const allPlaces = scheduleWithCustomItems.flatMap((day) => day.items.map((item) => ({ ...item, day: day.day })))
   const allShoppingItems = [...shoppingItems, ...customShoppingItems]
+    .filter((item) => !shoppingDeleted.includes(item.id))
+    .map((item) => ({ ...item, ...shoppingEdits[item.id], custom: item.custom }))
+
+  const editShoppingItem = (id, name) => {
+    const nextName = name.trim()
+    if (!nextName) return
+    setShoppingEdits((prev) => ({ ...prev, [id]: { name: nextName } }))
+  }
+
+  const deleteShoppingItem = (id) => {
+    setShoppingDeleted((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }
+
+  const editScheduleItem = (id, updates) => {
+    const name = updates.name.trim()
+    const time = updates.time.trim()
+    if (!name || !/^\d{2}:\d{2}$/.test(time)) return
+    setScheduleEdits((prev) => ({ ...prev, [id]: { day: updates.day, time, name } }))
+  }
+
+  const deleteScheduleItem = (id) => {
+    setScheduleDeleted((prev) => (prev.includes(id) ? prev : [...prev, id]))
+  }
 
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-950">
@@ -347,6 +391,8 @@ function App() {
               setFilter={setScheduleFilter}
               days={scheduleWithCustomItems}
               onAddSchedule={(item) => setCustomScheduleItems((prev) => [...prev, item])}
+              onEditSchedule={editScheduleItem}
+              onDeleteSchedule={deleteScheduleItem}
             />
           )}
           {activeTab === 'shopping' && (
@@ -354,6 +400,8 @@ function App() {
               checked={shoppingChecked}
               items={allShoppingItems}
               onAddItem={(item) => setCustomShoppingItems((prev) => [...prev, item])}
+              onEditItem={editShoppingItem}
+              onDeleteItem={deleteShoppingItem}
               onToggle={(id) => setShoppingChecked((prev) => ({ ...prev, [id]: !prev[id] }))}
             />
           )}
@@ -394,7 +442,7 @@ function SectionTitle({ title, subtitle }) {
   )
 }
 
-function Schedule({ filter, setFilter, days, onAddSchedule }) {
+function Schedule({ filter, setFilter, days, onAddSchedule, onEditSchedule, onDeleteSchedule }) {
   const [selectedDay, setSelectedDay] = useState(days[0].day)
   const [newSchedule, setNewSchedule] = useState({ day: days[0].day, time: '', name: '' })
   const currentDay = days.find((day) => day.day === selectedDay) || days[0]
@@ -501,7 +549,13 @@ function Schedule({ filter, setFilter, days, onAddSchedule }) {
 
       <div className="space-y-4">
         {filteredItems.map((item) => (
-          <PlaceCard item={item} key={item.id || `${currentDay.day}-${item.name}`} />
+          <PlaceCard
+            item={item}
+            days={days}
+            key={item.id || `${currentDay.day}-${item.name}`}
+            onEdit={onEditSchedule}
+            onDelete={onDeleteSchedule}
+          />
         ))}
         {filteredItems.length === 0 && (
           <div className="rounded-[12px] border border-slate-100 bg-white p-5 text-center text-sm font-bold text-slate-500 shadow-md shadow-slate-100">
@@ -513,8 +567,23 @@ function Schedule({ filter, setFilter, days, onAddSchedule }) {
   )
 }
 
-function PlaceCard({ item }) {
+function PlaceCard({ item, days, onEdit, onDelete }) {
   const category = categoryMeta[getCategory(item)]
+  const [isEditing, setIsEditing] = useState(false)
+  const [draft, setDraft] = useState({ day: item.day, time: item.time, name: item.name })
+  const canSave = draft.name.trim() && /^\d{2}:\d{2}$/.test(draft.time)
+
+  const startEditing = () => {
+    setDraft({ day: item.day, time: item.time, name: item.name })
+    setIsEditing(true)
+  }
+
+  const saveEdit = (event) => {
+    event.preventDefault()
+    if (!canSave) return
+    onEdit(item.id, draft)
+    setIsEditing(false)
+  }
 
   return (
     <div className="overflow-hidden rounded-[14px] border border-slate-100 bg-white shadow-lg shadow-slate-200/70 ring-1 ring-slate-50">
@@ -539,14 +608,60 @@ function PlaceCard({ item }) {
               Google Maps
             </a>
           )}
+          <div className="mt-3 flex justify-end gap-2">
+            <button type="button" onClick={startEditing} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+              수정
+            </button>
+            <button type="button" onClick={() => onDelete(item.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+              삭제
+            </button>
+          </div>
+          {isEditing && (
+            <form onSubmit={saveEdit} className="mt-3 rounded-[12px] bg-slate-50 p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <select
+                  value={draft.day}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, day: event.target.value }))}
+                  className="h-10 rounded-[10px] border border-slate-200 bg-white px-2 text-sm font-bold outline-none focus:border-blue-500"
+                >
+                  {days.map((day) => (
+                    <option key={day.day} value={day.day}>{day.day}</option>
+                  ))}
+                </select>
+                <input
+                  type="time"
+                  value={draft.time}
+                  onChange={(event) => setDraft((prev) => ({ ...prev, time: event.target.value }))}
+                  className="h-10 rounded-[10px] border border-slate-200 bg-white px-2 text-sm font-bold outline-none focus:border-blue-500"
+                  aria-label="수정할 시간"
+                />
+              </div>
+              <input
+                value={draft.name}
+                onChange={(event) => setDraft((prev) => ({ ...prev, name: event.target.value }))}
+                className="mt-2 h-10 w-full rounded-[10px] border border-slate-200 bg-white px-2 text-sm font-bold outline-none focus:border-blue-500"
+                maxLength={40}
+              />
+              <div className="mt-2 flex justify-end gap-2">
+                <button type="button" onClick={() => setIsEditing(false)} className="rounded-full bg-white px-3 py-1.5 text-xs font-bold text-slate-500">
+                  취소
+                </button>
+                <button type="submit" disabled={!canSave} className={`rounded-full px-3 py-1.5 text-xs font-bold ${canSave ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                  저장
+                </button>
+              </div>
+            </form>
+          )}
         </div>
       </div>
     </div>
   )
 }
 
-function Shopping({ checked, items, onToggle, onAddItem }) {
+function Shopping({ checked, items, onToggle, onAddItem, onEditItem, onDeleteItem }) {
   const [newItemName, setNewItemName] = useState('')
+  const [editingId, setEditingId] = useState('')
+  const [editName, setEditName] = useState('')
   const doneCount = items.filter((item) => checked[item.id] || checked[item.name]).length
   const itemName = newItemName.trim()
 
@@ -562,6 +677,20 @@ function Shopping({ checked, items, onToggle, onAddItem }) {
       custom: true
     })
     setNewItemName('')
+  }
+
+  const startEditing = (item) => {
+    setEditingId(item.id)
+    setEditName(item.name)
+  }
+
+  const saveEdit = (event, item) => {
+    event.preventDefault()
+    const nextName = editName.trim()
+    if (!nextName) return
+    onEditItem(item.id, nextName)
+    setEditingId('')
+    setEditName('')
   }
 
   return (
@@ -590,28 +719,60 @@ function Shopping({ checked, items, onToggle, onAddItem }) {
       </form>
       <div className="space-y-3">
         {items.map((item) => (
-          <button
+          <div
             key={item.id}
-            type="button"
-            onClick={() => onToggle(item.id)}
             className={`flex min-h-24 w-full items-center gap-3 rounded-[12px] border p-3 text-left shadow-sm transition ${
               checked[item.id] || checked[item.name] ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white active:bg-slate-50'
             }`}
           >
-            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border-2 text-lg font-extrabold ${
-              checked[item.id] || checked[item.name] ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100' : 'border-slate-300 bg-white text-transparent'
-            }`}>
+            <button
+              type="button"
+              onClick={() => onToggle(item.id)}
+              aria-label={`${item.name} 체크`}
+              className={`grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border-2 text-lg font-extrabold ${
+                checked[item.id] || checked[item.name] ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100' : 'border-slate-300 bg-white text-transparent'
+              }`}
+            >
               ✓
-            </span>
+            </button>
             <img src={item.image} alt={item.name} className={`h-20 w-20 shrink-0 rounded-[10px] object-cover ${checked[item.id] || checked[item.name] ? 'opacity-60' : ''}`} />
             <div className="min-w-0 flex-1">
               <div className="mb-2 flex items-center gap-2">
                 <span className={`rounded-full px-2 py-1 text-xs font-bold ${checked[item.id] || checked[item.name] ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
                 {(checked[item.id] || checked[item.name]) && <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">완료</span>}
               </div>
-              <p className={`break-keep text-base font-extrabold leading-6 ${checked[item.id] || checked[item.name] ? 'text-slate-400 line-through decoration-2' : 'text-slate-950'}`}>{item.name}</p>
+              {editingId === item.id ? (
+                <form onSubmit={(event) => saveEdit(event, item)} className="space-y-2">
+                  <input
+                    value={editName}
+                    onChange={(event) => setEditName(event.target.value)}
+                    className="h-10 w-full rounded-[10px] border border-slate-200 bg-white px-2 text-sm font-bold outline-none focus:border-blue-500"
+                    maxLength={40}
+                  />
+                  <div className="flex justify-end gap-2">
+                    <button type="button" onClick={() => setEditingId('')} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-500">
+                      취소
+                    </button>
+                    <button type="submit" disabled={!editName.trim()} className={`rounded-full px-3 py-1.5 text-xs font-bold ${editName.trim() ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-400'}`}>
+                      저장
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <>
+                  <p className={`break-keep text-base font-extrabold leading-6 ${checked[item.id] || checked[item.name] ? 'text-slate-400 line-through decoration-2' : 'text-slate-950'}`}>{item.name}</p>
+                  <div className="mt-2 flex justify-end gap-2">
+                    <button type="button" onClick={() => startEditing(item)} className="rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600">
+                      수정
+                    </button>
+                    <button type="button" onClick={() => onDeleteItem(item.id)} className="rounded-full bg-red-50 px-3 py-1.5 text-xs font-bold text-red-600">
+                      삭제
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>
