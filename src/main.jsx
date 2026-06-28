@@ -462,25 +462,28 @@ function Shopping({ checked, onToggle }) {
   return (
     <div>
       <SectionTitle title="구매리스트" subtitle={`${doneCount}/${shoppingItems.length}개 체크됨`} />
-      <div className="grid grid-cols-2 gap-3">
+      <div className="space-y-3">
         {shoppingItems.map((item) => (
           <button
             key={item.name}
             type="button"
             onClick={() => onToggle(item.name)}
-            className={`overflow-hidden rounded-[8px] border text-left shadow-sm transition ${
-              checked[item.name] ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white'
+            className={`flex min-h-24 w-full items-center gap-3 rounded-[12px] border p-3 text-left shadow-sm transition ${
+              checked[item.name] ? 'border-blue-500 bg-blue-50' : 'border-slate-100 bg-white active:bg-slate-50'
             }`}
           >
-            <img src={item.image} alt={item.name} className="h-28 w-full object-cover" />
-            <div className="p-3">
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">{item.category}</span>
-                <span className={`grid h-6 w-6 place-items-center rounded-[8px] border ${checked[item.name] ? 'border-blue-600 bg-blue-600 text-white' : 'border-slate-300 bg-white'}`}>
-                  {checked[item.name] ? '✓' : ''}
-                </span>
+            <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-[12px] border-2 text-lg font-extrabold ${
+              checked[item.name] ? 'border-blue-600 bg-blue-600 text-white shadow-md shadow-blue-100' : 'border-slate-300 bg-white text-transparent'
+            }`}>
+              ✓
+            </span>
+            <img src={item.image} alt={item.name} className={`h-20 w-20 shrink-0 rounded-[10px] object-cover ${checked[item.name] ? 'opacity-60' : ''}`} />
+            <div className="min-w-0 flex-1">
+              <div className="mb-2 flex items-center gap-2">
+                <span className={`rounded-full px-2 py-1 text-xs font-bold ${checked[item.name] ? 'bg-blue-100 text-blue-700' : 'bg-slate-100 text-slate-600'}`}>{item.category}</span>
+                {checked[item.name] && <span className="rounded-full bg-blue-600 px-2 py-1 text-xs font-bold text-white">완료</span>}
               </div>
-              <p className="text-sm font-bold leading-5">{item.name}</p>
+              <p className={`text-base font-extrabold leading-6 ${checked[item.name] ? 'text-slate-400 line-through decoration-2' : 'text-slate-950'}`}>{item.name}</p>
             </div>
           </button>
         ))}
